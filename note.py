@@ -1,8 +1,16 @@
 from datetime import datetime as date
 
+#from pydantic import BaseModel
+
 dateformat = "%Y-%m-%d %H:%M:%S"
 
-class Note:
+class Note():
+#class Note(BaseModel):
+    #ID: int
+    #title: str
+    #body: str
+    #date: str
+
     def __init__(self,ID,title,body):
         self.ID = ID
         self.title = title
