@@ -2,7 +2,6 @@
 
 
 ### TODO
-- api search
 - sqlite persistent db
 - pydantic validation
 - ollama
