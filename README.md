@@ -2,7 +2,8 @@
 
 
 ### TODO
-- sqlite persistent db
+- sqlite trigger for update datetime
+- sqlite search function
 - pydantic validation
 - ollama
 

@@ -11,7 +11,6 @@ TIMEOUT_REQUEST = int(os.environ.get("TIMEOUT_REQUEST", 2))
 
 
 app = FastAPI()
-con,cur = conn()
 
 
 class NoteUpdateModel(BaseModel):
@@ -26,33 +25,68 @@ def unprocessableEntityException() -> HTTPException:
 
 @app.get("/notes/{note_id}",status_code=status.HTTP_200_OK)  
 def get_note(note_id: int):
-    exists = True
-    if not exists:
+    with conn() as con:
+        cur = con.cursor()
+        query = "SELECT * FROM notes WHERE id = ?"
+        cur.execute(query, (note_id,))
+        note = cur.fetchone()
+
+    if note is None:
         raise notfoundException(note_id)
-    return {f"note {note_id}"} # TODO get note from database
+    return note
 
 @app.get("/notes",status_code=status.HTTP_200_OK)    
 def get_note(skip: int = 0, limit: int = 20):
-    return {f"all notes"} # TODO get all notes from database
+    with conn() as con:
+        cur = con.cursor()
+        query = f"SELECT * FROM notes LIMIT ? OFFSET ?"
+        cur.execute(query, (limit, skip))
 
+        return cur.fetchall()
 
-@app.post("/notes/edit/{note_id}",status_code=status.HTTP_200_OK) # TODO update on DB
-async def edit_note(node_id:int, note_update: NoteUpdateModel):
-    exists = True
-    if not exists:
-        raise notfoundException(node_id)
+@app.post("/notes/edit/{note_id}",status_code=status.HTTP_200_OK)
+async def edit_note(note_id:int, note_update: NoteUpdateModel):
+    if (note_update.title is None) and (note_update.body is None): # CHECK maybe not needed for pydantic validation
+            raise unprocessableEntityException()
 
-    if (note_update.title is None) and (note_update.body is None):
-        raise unprocessableEntityException()
+    
+    with conn() as con:
+        cur = con.cursor()
+        query = """UPDATE NOTES SET 
+                    title = COALESCE(?, title), 
+                    body = COALESCE(?, body) 
+                    WHERE id = ?"""
+        cur.execute(query, (note_update.title, note_update.body, note_id))
+        updated_rows = cur.rowcount
 
-@app.post("/notes/create",status_code=status.HTTP_201_CREATED) # TODO insert note into database
+        if updated_rows == 0:
+            raise notfoundException(note_id)
+        
+        con.commit()
+
+    
+
+@app.post("/notes/create",status_code=status.HTTP_201_CREATED)
 async def create_note(note: NoteUpdateModel):
-    return note 
+    if (note.title is None) and (note.body is None):
+            raise unprocessableEntityException()
+    with conn() as con:
+        cur = con.cursor()
 
-@app.delete("/notes/delete/{note_id}",status_code=status.HTTP_204_NO_CONTENT) # TODO delete note from database
+        query = f"INSERT INTO notes (title, body) VALUES (?, ?)"
+        cur.execute(query, (note.title, note.body))
+        
+
+@app.delete("/notes/delete/{note_id}",status_code=status.HTTP_204_NO_CONTENT)
 async def delete_note(note_id: int):
-    exist = True
-    if not exist:
+    with conn() as con:
+        cur = con.cursor()
+        query = "DELETE FROM notes WHERE id = ?"
+        cur.execute(query, (note_id,))
+        deleted_rows = cur.rowcount
+        con.commit()
+
+    if deleted_rows == 0:
         raise notfoundException(note_id)
 
 
