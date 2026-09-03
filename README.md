@@ -2,8 +2,7 @@
 
 
 ### TODO
-- sqlite trigger for update datetime
-- sqlite search function
+- search api validation date consistency
 - pydantic validation
 - ollama
 

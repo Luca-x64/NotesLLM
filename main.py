@@ -1,16 +1,25 @@
 import os
-from fastapi import FastAPI, HTTPException, Response, status
+from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
+from datetime import date as Date
+from contextlib import asynccontextmanager
 from note import Note
 from connection import connect_to_db as conn 
+from connection import create_db
 
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:1b")
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "") # TODO
 TIMEOUT_REQUEST = int(os.environ.get("TIMEOUT_REQUEST", 2)) 
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db()
+    yield
 
-app = FastAPI()
+
+app = FastAPI(lifespan=lifespan)
+
 
 
 class NoteUpdateModel(BaseModel):
@@ -90,12 +99,46 @@ async def delete_note(note_id: int):
         raise notfoundException(note_id)
 
 
+class NoteSearchModel(BaseModel):
+    title: str | None = None
+    date: Date | None = None
+    first_date: Date | None = None
+    second_date: Date | None = None
 
-@app.get("/notes/search/",status_code=status.HTTP_200_OK) # TODO search logic
-def search_notes(title: str | None = None, body: str | None = None):
-    if (title is None) and (body is None):
+def parse_date(date):
+    return date.isoformat() if date is not None else None
+
+
+@app.post("/notes/search/",status_code=status.HTTP_200_OK) 
+def search_notes(searchparams: NoteSearchModel):
+    title = searchparams.title
+    date = searchparams.date
+    fd = searchparams.first_date
+    sd = searchparams.second_date
+
+    if (title is None) and (date is None) and (fd is None) and (sd is None): # TODO check if fd is present and sd is not present or vice versa, then raise exception, then check if fd is greater than sd, then raise exception 
         raise unprocessableEntityException()
-    return {f"search notes with title {title} and body {body}"} # TODO search notes from database
+    
+    with conn() as con:
+        cur = con.cursor()
+        query = """SELECT * FROM notes
+                   WHERE (? IS NULL OR title LIKE ?)
+                     AND (? IS NULL OR date(date) = date(?))
+                     AND (? IS NULL OR date(date) >= date(?))
+                     AND (? IS NULL OR date(date) <= date(?))"""
+        
+        newtitle = f"%{title}%" if title is not None else None
+        exact_date = parse_date(date)
+        first_date = parse_date(fd)
+        second_date = parse_date(sd)
+
+        cur.execute(query, (newtitle, newtitle, 
+                            exact_date, exact_date,
+                            first_date, first_date, 
+                            second_date, second_date))
+        notes = cur.fetchall()
+
+    return notes
 
 
 ## LLM API
