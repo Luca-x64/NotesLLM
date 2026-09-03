@@ -21,7 +21,8 @@ class NoteUpdateModel(BaseModel):
 
 def notfoundException(  note_id: int) -> HTTPException:
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"error":"Not Found","message":f"Note with ID {note_id} does not exist."})
-
+def unprocessableEntityException() -> HTTPException:
+    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"error":"Unprocessable Entity","message":f"Empty request body. At least one of 'title' or 'body' must be provided."})
 
 
 @app.get("/notes/{note_id}",status_code=status.HTTP_200_OK)  
@@ -43,7 +44,7 @@ async def edit_note(node_id:int, note_update: NoteUpdateModel):
         raise notfoundException(node_id)
 
     if (note_update.title is None) and (note_update.body is None):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"error":"Unprocessable Entity","message":f"Empty request body. At least one of 'title' or 'body' must be provided."})
+        raise unprocessableEntityException()
 
 @app.post("/notes/create",status_code=status.HTTP_201_CREATED) # TODO insert note into database
 async def create_note(note: NoteUpdateModel):
@@ -51,16 +52,30 @@ async def create_note(note: NoteUpdateModel):
 
 @app.delete("/notes/delete/{note_id}",status_code=status.HTTP_204_NO_CONTENT) # TODO delete note from database
 async def delete_note(note_id: int):
-    success = True
-    id_not_found = True
-    if id_not_found:
+    exist = True
+    if not exist:
         raise notfoundException(note_id)
 
-# TODO:
 
 
+@app.get("/notes/search/",status_code=status.HTTP_200_OK) # TODO search logic
+def search_notes(title: str | None = None, body: str | None = None):
+    if (title is None) and (body is None):
+        raise unprocessableEntityException()
+    return {f"search notes with title {title} and body {body}"} # TODO search notes from database
 
-#@app.get("/notes/search",status_code=status.HTTP_200_OK) # TODO search logic
 
+## LLM API
+@app.get("/notes/summarize_body/{note_id}",status_code=status.HTTP_200_OK) # TODO 
+async def summarize_body(note_id: int):
+    exists = True
+    if not exists:
+        raise notfoundException(note_id)
+    return {f"summarize body of note {note_id}"} # TODO get note from database and call LLM API to summarize body
 
-
+@app.get("/notes/suggest_title/{note_id}",status_code=status.HTTP_200_OK) # TODO 
+async def suggest_title(note_id: int):
+    exists = True
+    if not exists:
+        raise notfoundException(note_id)
+    return {f"suggest title of note {note_id}"} # TODO get note from database and call LLM API to suggest title
