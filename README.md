@@ -2,7 +2,7 @@
 
 
 ### TODO
-- sqlite persistent db
+- search api validation date consistency
 - pydantic validation
 - ollama
 

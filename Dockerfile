@@ -9,3 +9,4 @@ EXPOSE 8000
 
 
 CMD ["fastapi", "run", "main.py", "--port", "8000"]
+#CMD ["python", "connection.py"] # testing only

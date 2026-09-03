@@ -1,15 +1,25 @@
 import os
-from fastapi import FastAPI, HTTPException, Response, status
+from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
+from datetime import date as Date
+from contextlib import asynccontextmanager
 from note import Note
+from connection import connect_to_db as conn 
+from connection import create_db
 
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:1b")
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "") # TODO
 TIMEOUT_REQUEST = int(os.environ.get("TIMEOUT_REQUEST", 2)) 
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db()
+    yield
 
-app = FastAPI()
+
+app = FastAPI(lifespan=lifespan)
+
 
 
 class NoteUpdateModel(BaseModel):
@@ -24,42 +34,111 @@ def unprocessableEntityException() -> HTTPException:
 
 @app.get("/notes/{note_id}",status_code=status.HTTP_200_OK)  
 def get_note(note_id: int):
-    exists = True
-    if not exists:
+    with conn() as con:
+        cur = con.cursor()
+        query = "SELECT * FROM notes WHERE id = ?"
+        cur.execute(query, (note_id,))
+        note = cur.fetchone()
+
+    if note is None:
         raise notfoundException(note_id)
-    return {f"note {note_id}"} # TODO get note from database
+    return note
 
 @app.get("/notes",status_code=status.HTTP_200_OK)    
 def get_note(skip: int = 0, limit: int = 20):
-    return {f"all notes"} # TODO get all notes from database
+    with conn() as con:
+        cur = con.cursor()
+        query = f"SELECT * FROM notes LIMIT ? OFFSET ?"
+        cur.execute(query, (limit, skip))
 
+        return cur.fetchall()
 
-@app.post("/notes/edit/{note_id}",status_code=status.HTTP_200_OK) # TODO update on DB
-async def edit_note(node_id:int, note_update: NoteUpdateModel):
-    exists = True
-    if not exists:
-        raise notfoundException(node_id)
+@app.post("/notes/edit/{note_id}",status_code=status.HTTP_200_OK)
+async def edit_note(note_id:int, note_update: NoteUpdateModel):
+    if (note_update.title is None) and (note_update.body is None): # CHECK maybe not needed for pydantic validation
+            raise unprocessableEntityException()
 
-    if (note_update.title is None) and (note_update.body is None):
-        raise unprocessableEntityException()
+    
+    with conn() as con:
+        cur = con.cursor()
+        query = """UPDATE NOTES SET 
+                    title = COALESCE(?, title), 
+                    body = COALESCE(?, body) 
+                    WHERE id = ?"""
+        cur.execute(query, (note_update.title, note_update.body, note_id))
+        updated_rows = cur.rowcount
 
-@app.post("/notes/create",status_code=status.HTTP_201_CREATED) # TODO insert note into database
+        if updated_rows == 0:
+            raise notfoundException(note_id)
+        
+        con.commit()
+
+    
+
+@app.post("/notes/create",status_code=status.HTTP_201_CREATED)
 async def create_note(note: NoteUpdateModel):
-    return note 
+    if (note.title is None) and (note.body is None):
+            raise unprocessableEntityException()
+    with conn() as con:
+        cur = con.cursor()
 
-@app.delete("/notes/delete/{note_id}",status_code=status.HTTP_204_NO_CONTENT) # TODO delete note from database
+        query = f"INSERT INTO notes (title, body) VALUES (?, ?)"
+        cur.execute(query, (note.title, note.body))
+        
+
+@app.delete("/notes/delete/{note_id}",status_code=status.HTTP_204_NO_CONTENT)
 async def delete_note(note_id: int):
-    exist = True
-    if not exist:
+    with conn() as con:
+        cur = con.cursor()
+        query = "DELETE FROM notes WHERE id = ?"
+        cur.execute(query, (note_id,))
+        deleted_rows = cur.rowcount
+        con.commit()
+
+    if deleted_rows == 0:
         raise notfoundException(note_id)
 
 
+class NoteSearchModel(BaseModel):
+    title: str | None = None
+    date: Date | None = None
+    first_date: Date | None = None
+    second_date: Date | None = None
 
-@app.get("/notes/search/",status_code=status.HTTP_200_OK) # TODO search logic
-def search_notes(title: str | None = None, body: str | None = None):
-    if (title is None) and (body is None):
+def parse_date(date):
+    return date.isoformat() if date is not None else None
+
+
+@app.post("/notes/search/",status_code=status.HTTP_200_OK) 
+def search_notes(searchparams: NoteSearchModel):
+    title = searchparams.title
+    date = searchparams.date
+    fd = searchparams.first_date
+    sd = searchparams.second_date
+
+    if (title is None) and (date is None) and (fd is None) and (sd is None): # TODO check if fd is present and sd is not present or vice versa, then raise exception, then check if fd is greater than sd, then raise exception 
         raise unprocessableEntityException()
-    return {f"search notes with title {title} and body {body}"} # TODO search notes from database
+    
+    with conn() as con:
+        cur = con.cursor()
+        query = """SELECT * FROM notes
+                   WHERE (? IS NULL OR title LIKE ?)
+                     AND (? IS NULL OR date(date) = date(?))
+                     AND (? IS NULL OR ? IS NULL
+                     OR date(date) BETWEEN date(?) AND date(?))"""
+        
+        newtitle = f"%{title}%" if title is not None else None
+        exact_date = parse_date(date)
+        first_date = parse_date(fd)
+        second_date = parse_date(sd)
+
+        cur.execute(query, (newtitle, newtitle, 
+                            exact_date, exact_date,
+                            first_date,second_date,
+                            first_date, second_date))
+        notes = cur.fetchall()
+
+    return notes
 
 
 ## LLM API
