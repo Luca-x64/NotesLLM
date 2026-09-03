@@ -2,6 +2,7 @@ import os
 from fastapi import FastAPI, HTTPException, Response, status
 from pydantic import BaseModel
 from note import Note
+from connection import connect_to_db as conn 
 
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:1b")
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "") # TODO
@@ -10,6 +11,7 @@ TIMEOUT_REQUEST = int(os.environ.get("TIMEOUT_REQUEST", 2))
 
 
 app = FastAPI()
+con,cur = conn()
 
 
 class NoteUpdateModel(BaseModel):
