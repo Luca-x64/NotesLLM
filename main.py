@@ -124,8 +124,8 @@ def search_notes(searchparams: NoteSearchModel):
         query = """SELECT * FROM notes
                    WHERE (? IS NULL OR title LIKE ?)
                      AND (? IS NULL OR date(date) = date(?))
-                     AND (? IS NULL OR date(date) >= date(?))
-                     AND (? IS NULL OR date(date) <= date(?))"""
+                     AND (? IS NULL OR ? IS NULL
+                     OR date(date) BETWEEN date(?) AND date(?))"""
         
         newtitle = f"%{title}%" if title is not None else None
         exact_date = parse_date(date)
@@ -134,8 +134,8 @@ def search_notes(searchparams: NoteSearchModel):
 
         cur.execute(query, (newtitle, newtitle, 
                             exact_date, exact_date,
-                            first_date, first_date, 
-                            second_date, second_date))
+                            first_date,second_date,
+                            first_date, second_date))
         notes = cur.fetchall()
 
     return notes
