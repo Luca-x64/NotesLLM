@@ -1,6 +1,10 @@
 # NotesLLM
 
 
+### TODO
+api search
+docker
+pydantic validation
 
 
 
