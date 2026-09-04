@@ -37,3 +37,4 @@ def create_db():
             END;
         """)
         conn.commit()
+

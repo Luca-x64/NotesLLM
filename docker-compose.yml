@@ -7,7 +7,13 @@ services:
       - .env
     volumes:
       - database:/data
-
-
+    depends_on:
+      - ollama
+  ollama:
+    image: ollama/ollama:latest
+    volumes: 
+      - ollama_data:/root/.ollama
+      
 volumes:
   database:
+  ollama_data:

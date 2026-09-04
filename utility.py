@@ -9,3 +9,4 @@ def unprocessableEntityException() -> HTTPException:
 
 def parse_date(date):
     return date.isoformat() if date is not None else None
+

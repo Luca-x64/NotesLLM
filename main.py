@@ -6,9 +6,11 @@ from connection import connect_to_db as conn
 from connection import create_db
 from utility import notfoundException, unprocessableEntityException, parse_date
 
+import requests
+
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:1b")
-OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "") # TODO
-TIMEOUT_REQUEST = int(os.environ.get("TIMEOUT_REQUEST", 2)) 
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://ollama:11434")
+TIMEOUT_REQUEST = int(os.environ.get("TIMEOUT_REQUEST", 10)) 
 
 
 @asynccontextmanager
@@ -17,6 +19,8 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
+
+
 
 
 @app.get("/notes/{note_id}",status_code=status.HTTP_200_OK)  
@@ -119,18 +123,40 @@ def search_notes(searchparams: NoteSearchModel):
 
     return notes
 
+def get_notebody_by_id(note_id: int):
+    with conn() as con:
+        cur = con.cursor()  
+        query = "SELECT body FROM notes WHERE id = ?"
+        cur.execute(query, (note_id,))
+        note = cur.fetchone()
+
+    if note is None:
+        raise notfoundException(note_id)
+    return note[0]
+
+def ask_model(system_prompt: str, user_prompt: str):
+    payload = {
+    "model": OLLAMA_MODEL,
+    "stream": False,
+    "messages": [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt}
+    ]}
+    response = requests.post(OLLAMA_BASE_URL + "/api/chat", json=payload, timeout=TIMEOUT_REQUEST)
+    print(response.status_code) #DEBUG
+    print(response.text) # DEBUG
+    return response.json()["message"]["content"] 
 
 ## LLM API
-@app.get("/notes/summarize_body/{note_id}",status_code=status.HTTP_200_OK) # TODO 
+@app.get("/notes/summarize_body/{note_id}",status_code=status.HTTP_200_OK) 
 async def summarize_body(note_id: int):
-    exists = True
-    if not exists:
-        raise notfoundException(note_id)
-    return {f"summarize body of note {note_id}"} # TODO get note from database and call LLM API to summarize body
+    body = get_notebody_by_id(note_id)
+    response = ask_model("Sei un assistente che riassume testi in italiano", "genera un riassunto di circa due righe, rispondi solo con il riassunto: "+ body)
+    return {f"{response}"}
 
 @app.get("/notes/suggest_title/{note_id}",status_code=status.HTTP_200_OK) # TODO 
 async def suggest_title(note_id: int):
-    exists = True
-    if not exists:
-        raise notfoundException(note_id)
-    return {f"suggest title of note {note_id}"} # TODO get note from database and call LLM API to suggest title
+    body = get_notebody_by_id(note_id)
+    #response = ask_model("Sei un assistente italiano,che propone un titolo breve e coerente dato un testo", body)
+    
+    return {f"suggest title of note {note_id}: with body: {body}"} # TODO g call LLM API to suggest title
