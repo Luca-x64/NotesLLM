@@ -1,11 +1,10 @@
 import os
-from fastapi import FastAPI, HTTPException, status
-from pydantic import BaseModel
-from datetime import date as Date
+from fastapi import FastAPI,status
 from contextlib import asynccontextmanager
-from note import Note
+from model import NoteSearchModel, NoteUpdateModel
 from connection import connect_to_db as conn 
 from connection import create_db
+from utility import notfoundException, unprocessableEntityException, parse_date
 
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:1b")
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "") # TODO
@@ -17,19 +16,7 @@ async def lifespan(app: FastAPI):
     create_db()
     yield
 
-
 app = FastAPI(lifespan=lifespan)
-
-
-
-class NoteUpdateModel(BaseModel):
-    title: str | None
-    body: str  | None 
-
-def notfoundException(  note_id: int) -> HTTPException:
-    return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"error":"Not Found","message":f"Note with ID {note_id} does not exist."})
-def unprocessableEntityException() -> HTTPException:
-    return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"error":"Unprocessable Entity","message":f"Empty request body. At least one of 'title' or 'body' must be provided."})
 
 
 @app.get("/notes/{note_id}",status_code=status.HTTP_200_OK)  
@@ -99,14 +86,6 @@ async def delete_note(note_id: int):
         raise notfoundException(note_id)
 
 
-class NoteSearchModel(BaseModel):
-    title: str | None = None
-    date: Date | None = None
-    first_date: Date | None = None
-    second_date: Date | None = None
-
-def parse_date(date):
-    return date.isoformat() if date is not None else None
 
 
 @app.post("/notes/search/",status_code=status.HTTP_200_OK) 
