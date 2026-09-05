@@ -151,12 +151,11 @@ def ask_model(system_prompt: str, user_prompt: str):
 @app.get("/notes/summarize_body/{note_id}",status_code=status.HTTP_200_OK) 
 async def summarize_body(note_id: int):
     body = get_notebody_by_id(note_id)
-    response = ask_model("Sei un assistente che riassume testi in italiano", "genera un riassunto di circa due righe, rispondi solo con il riassunto: "+ body)
+    response = ask_model("Sei un assistente che riassume testi in italiano, generando riassunti brevi e coerenti, basati solo sul contenuto del testo, non aggiungere parole che non fanno riferimento al riassunto. Il riassunto è di circa due righe", body)
     return {f"{response}"}
 
-@app.get("/notes/suggest_title/{note_id}",status_code=status.HTTP_200_OK) # TODO 
+@app.get("/notes/suggest_title/{note_id}",status_code=status.HTTP_200_OK)
 async def suggest_title(note_id: int):
     body = get_notebody_by_id(note_id)
-    #response = ask_model("Sei un assistente italiano,che propone un titolo breve e coerente dato un testo", body)
-    
-    return {f"suggest title of note {note_id}: with body: {body}"} # TODO g call LLM API to suggest title
+    response = ask_model('Sei un assistente che propone titoli brevi e coerenti per testi in italiano, basati solo sul contenuto del testo, non aggiungere parole che non fanno riferimento al titolo. non inserire alcun testo extra (tipo "Titolo:""), solo il titolo proposto. Non inserire caratteri speciali, tipo escape sequences', body)
+    return {f"{response}"}
