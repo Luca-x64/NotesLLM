@@ -2,7 +2,6 @@
 
 
 ### TODO
-- auto update ID consistency from 0
 - search api validation date consistency
 - pydantic validation
     - il titolo è obbligatorio;
