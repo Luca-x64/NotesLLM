@@ -4,14 +4,7 @@ from contextlib import asynccontextmanager
 from model import NoteSearchModel, NoteUpdateModel
 from connection import connect_to_db as conn 
 from connection import create_db
-from utility import notfoundException, unprocessableEntityException, parse_date
-
-import requests
-
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:1b")
-OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://ollama:11434")
-TIMEOUT_REQUEST = int(os.environ.get("TIMEOUT_REQUEST", 10)) 
-
+from utility import *
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -19,7 +12,6 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(lifespan=lifespan)
-
 
 
 
@@ -36,11 +28,11 @@ def get_note(note_id: int):
     return note
 
 @app.get("/notes",status_code=status.HTTP_200_OK)    
-def get_note(skip: int = 0, limit: int = 20):
+def get_note(limit: int = 20):
     with conn() as con:
         cur = con.cursor()
-        query = f"SELECT * FROM notes LIMIT ? OFFSET ?"
-        cur.execute(query, (limit, skip))
+        query = f"SELECT * FROM notes LIMIT ?"
+        cur.execute(query, (limit,))
 
         return cur.fetchall()
 
@@ -134,28 +126,16 @@ def get_notebody_by_id(note_id: int):
         raise notfoundException(note_id)
     return note[0]
 
-def ask_model(system_prompt: str, user_prompt: str):
-    payload = {
-    "model": OLLAMA_MODEL,
-    "stream": False,
-    "messages": [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt}
-    ]}
-    response = requests.post(OLLAMA_BASE_URL + "/api/chat", json=payload, timeout=TIMEOUT_REQUEST)
-    print(response.status_code) #DEBUG
-    print(response.text) # DEBUG
-    return response.json()["message"]["content"] 
 
 ## LLM API
 @app.get("/notes/summarize_body/{note_id}",status_code=status.HTTP_200_OK) 
 async def summarize_body(note_id: int):
     body = get_notebody_by_id(note_id)
     response = ask_model("Sei un assistente che riassume testi in italiano, generando riassunti brevi e coerenti, basati solo sul contenuto del testo, non aggiungere parole che non fanno riferimento al riassunto. Il riassunto è di circa due righe", body)
-    return {f"{response}"}
+    return response
 
 @app.get("/notes/suggest_title/{note_id}",status_code=status.HTTP_200_OK)
 async def suggest_title(note_id: int):
     body = get_notebody_by_id(note_id)
     response = ask_model('Sei un assistente che propone titoli brevi e coerenti per testi in italiano, basati solo sul contenuto del testo, non aggiungere parole che non fanno riferimento al titolo. non inserire alcun testo extra (tipo "Titolo:""), solo il titolo proposto. Non inserire caratteri speciali, tipo escape sequences', body)
-    return {f"{response}"}
+    return response
