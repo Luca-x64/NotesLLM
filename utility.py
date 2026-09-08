@@ -35,7 +35,7 @@ def llm_request(url, payload, timeout):
     
     try:
         content =  response.json()["message"]["content"] 
-    except requests.exceptions.JSONDecodeError | KeyError | TypeError as e:
+    except (requests.exceptions.JSONDecodeError, KeyError, TypeError) as e:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail={"error":"Invalid Response","message":f"Ollama returned an invalid response. {e}"})
     
     
