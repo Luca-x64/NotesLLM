@@ -1,11 +1,11 @@
 import os
-from unittest import case
 from fastapi import HTTPException,status
 import requests
 
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.2:1b")
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://ollama:11434")
 TIMEOUT_REQUEST = int(os.environ.get("TIMEOUT_REQUEST", 30)) 
+OLLAMA_API_RELATIVE_URL = os.environ.get("OLLAMA_API_RELATIVE_URL", "/api/chat")
 
 def notfoundException(  note_id: int) -> HTTPException:
     return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"error":"Not Found","message":f"Note with ID {note_id} does not exist."})
@@ -47,7 +47,7 @@ def ask_model(system_prompt: str, user_prompt: str):
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt}
     ]}
-    content = llm_request(OLLAMA_BASE_URL + "/api/chat", payload, TIMEOUT_REQUEST)
+    content = llm_request(OLLAMA_BASE_URL + OLLAMA_API_RELATIVE_URL, payload, TIMEOUT_REQUEST)
     return content
 
 def parse_date(date):
